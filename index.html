@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="ko" class="light" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Azit 1.0.18 - Private Network</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+tailwind.config={darkMode:'class',theme:{extend:{colors:{
+ivory:{50:'#fdfbf7',100:'#faf8f5',200:'#f3eee7',300:'#e5dcd3',800:'#334155',900:'#0f172a'},
+navy:{500:'#3b82f6',600:'#1d4ed8',800:'#1e293b',900:'#0f172a'},
+darkbg:{800:'#272422',900:'#1c1b1a',950:'#141312'},
+brown:{400:'#a88a74',500:'#8c6d58',600:'#705442',900:'#3a2e26'}
+}}}};
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.custom-scrollbar::-webkit-scrollbar{width:4px}.custom-scrollbar::-webkit-scrollbar-track{background:transparent}
+.custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb{background:#3a3532}
+.switch{position:relative;display:inline-block;width:50px;height:28px}.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#cbd5e1;transition:.3s;border-radius:34px}
+.slider:before{position:absolute;content:"";height:22px;width:22px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%;box-shadow:0 2px 4px #0003}
+input:checked+.slider{background:#8c6d58}input:checked+.slider:before{transform:translateX(22px)}
+
+button{transition:transform .2s cubic-bezier(.22,1,.36,1),background-color .25s ease,box-shadow .25s ease,opacity .25s ease}button:active{transform:scale(.97)}
+.screen-enter{animation:screenEnter .42s cubic-bezier(.22,1,.36,1)}
+.message-enter{animation:messageEnter .28s cubic-bezier(.22,1,.36,1)}
+.modal-enter{animation:modalEnter .3s cubic-bezier(.22,1,.36,1)}
+@keyframes screenEnter{from{opacity:0;transform:translateY(9px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes messageEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes modalEnter{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+.chat-bubble{transition:transform .18s ease,box-shadow .18s ease}.chat-bubble:hover{transform:translateY(-1px);box-shadow:0 5px 15px #0000000d}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* 세로만 화면 높이에 맞추고, 가로는 기존 작은 휴대폰 화면 비율을 유지 */
+body > div:first-of-type{
+  height:100dvh !important;
+  max-width:28rem !important;
+}
+@media (min-width: 768px){
+  #screenMainMenu{overflow-y:auto;}
+}
+</style>
+</head>
+<body id="bodyRoot" class="bg-ivory-200 dark:bg-darkbg-950 text-slate-800 dark:text-slate-100 font-sans min-h-screen flex items-center justify-center sm:p-4">
+<div class="w-full max-w-md h-screen sm:h-[840px] bg-ivory-100 dark:bg-darkbg-900 sm:rounded-3xl border border-ivory-300 dark:border-neutral-800 shadow-2xl flex flex-col overflow-hidden relative">
+
+<section id="screenAuth" class="flex-1 flex flex-col justify-center p-6 space-y-6">
+<div class="text-center space-y-2">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-navy-800/10 dark:bg-brown-500/20 text-navy-800 dark:text-brown-400"><i class="fa-solid fa-comments text-3xl"></i></div>
+<h1 class="text-2xl font-bold text-navy-800 dark:text-slate-100">Azit</h1>
+<p class="text-xs text-slate-500 dark:text-neutral-400">비밀스러운 우리들만의 프라이빗 아지트</p>
+</div>
+<div class="flex bg-ivory-200 dark:bg-darkbg-950 p-1 rounded-xl border border-ivory-300 dark:border-neutral-800 text-xs font-semibold">
+<button id="tabLogin" onclick="switchAuthMode('login')" class="flex-1 py-2 rounded-lg bg-navy-800 text-white dark:bg-brown-500 shadow-sm">로그인</button>
+<button id="tabRegister" onclick="switchAuthMode('register')" class="flex-1 py-2 rounded-lg text-slate-500 dark:text-neutral-400">회원가입</button>
+</div>
+<form onsubmit="handleAuth(event)" class="space-y-3">
+<div id="displayNameGroup" class="hidden space-y-1"><label class="text-[11px] text-slate-500">닉네임</label><input id="authDisplayName" placeholder="닉네임 입력" class="w-full bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs"></div>
+<div class="space-y-1"><label class="text-[11px] text-slate-500">이메일 주소</label><input type="email" id="authEmail" required placeholder="user@azit.com" class="w-full bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs"></div>
+<div class="space-y-1"><label class="text-[11px] text-slate-500">비밀번호</label><input type="password" id="authPassword" required placeholder="••••••••" class="w-full bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs"></div>
+<p id="authMessage" class="text-[11px] text-rose-500 min-h-4"></p>
+<button id="authSubmit" class="w-full bg-navy-800 dark:bg-brown-500 text-white font-semibold py-3 rounded-xl text-xs shadow-md">로그인</button>
+</form>
+</section>
+
+<section id="screenMainMenu" class="hidden flex-1 flex flex-col items-center justify-center p-6 text-center space-y-8">
+<div class="space-y-3"><div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-navy-800/10 dark:bg-brown-500/20 text-navy-800 dark:text-brown-400"><i class="fa-solid fa-cubes text-4xl"></i></div><h2 class="text-2xl font-bold">AZIT</h2><p id="welcomeText" class="text-xs text-slate-500"></p></div>
+<div class="w-full space-y-3 max-w-xs">
+<div id="existingRoomsSection" class="hidden text-left space-y-2 mb-4">
+  <div class="flex items-center justify-between px-1"><h3 class="text-xs font-bold">기존에 참가한 방</h3><span id="existingRoomCount" class="text-[10px] text-slate-400"></span></div>
+  <div id="existingRoomsList" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
+</div>
+<button onclick="showScreen('screenCreateRoom')" class="w-full bg-navy-800 dark:bg-brown-500 text-white font-semibold py-3.5 rounded-2xl text-xs"><i class="fa-solid fa-plus mr-2"></i>방 생성하기</button>
+<button onclick="showScreen('screenJoinRoom')" class="w-full bg-white dark:bg-darkbg-800 border border-ivory-300 dark:border-neutral-700 font-semibold py-3.5 rounded-2xl text-xs"><i class="fa-solid fa-key text-emerald-600 mr-2"></i>방 참가하기</button>
+<button onclick="handleLogout()" class="w-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold py-3.5 rounded-2xl text-xs border border-rose-500/20"><i class="fa-solid fa-right-from-bracket mr-2"></i>로그아웃</button>
+</div></section>
+
+<section id="screenCreateRoom" class="hidden flex-1 flex flex-col justify-between p-6">
+<div class="space-y-6 my-auto"><div class="text-center"><h3 class="text-xl font-bold">새 프라이빗 방 생성</h3><p class="text-xs text-slate-500">개설할 방의 이름과 코드를 설정하세요</p></div>
+<form onsubmit="handleCreateRoom(event)" class="space-y-4">
+<input id="newRoomName" required placeholder="방 이름을 입력하세요" class="w-full bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-xs">
+<div class="flex gap-2"><input id="newRoomCode" readonly class="flex-1 bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-xs text-center font-mono font-bold tracking-widest"><button type="button" onclick="rerollCode()" class="w-11 rounded-xl bg-ivory-200 dark:bg-darkbg-800"><i class="fa-solid fa-rotate-right"></i></button></div>
+<button class="w-full bg-navy-800 dark:bg-brown-500 text-white font-semibold py-3.5 rounded-xl text-xs">방 생성 완료 및 입장</button>
+</form></div>
+<button onclick="showScreen('screenMainMenu')" class="w-full bg-ivory-200 dark:bg-darkbg-800 py-3 rounded-xl text-xs">취소하기</button>
+</section>
+
+<section id="screenJoinRoom" class="hidden flex-1 flex flex-col justify-between p-6">
+<div class="space-y-6 my-auto"><div class="text-center"><h3 class="text-xl font-bold">방 참가하기</h3><p class="text-xs text-slate-500">전달받은 4자리 방 코드를 입력하세요</p></div>
+<form onsubmit="handleJoinRoom(event)" class="space-y-4"><input id="joinRoomCode" required maxlength="4" placeholder="코드 입력" class="w-full bg-white dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-xs text-center font-mono font-bold uppercase">
+<button class="w-full bg-emerald-600 text-white font-semibold py-3.5 rounded-xl text-xs">방 입장하기</button></form></div>
+<button onclick="showScreen('screenMainMenu')" class="w-full bg-ivory-200 dark:bg-darkbg-800 py-3 rounded-xl text-xs">취소하기</button>
+</section>
+
+<div id="screenInRoom" class="hidden flex-1 flex-col h-full overflow-hidden bg-ivory-50 dark:bg-darkbg-950">
+<section id="tabContentHome" class="flex-1 p-5 overflow-y-auto custom-scrollbar space-y-6">
+<div class="bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 rounded-2xl p-4 flex items-center space-x-4">
+<div id="homeMyAvatar" class="w-14 h-14 rounded-full bg-navy-800 dark:bg-brown-500 text-white flex items-center justify-center font-bold text-lg bg-cover bg-center overflow-hidden">유</div>
+<div><div class="flex items-center gap-2"><h3 id="homeMyName" class="text-sm font-bold">사용자</h3><span class="text-[10px] bg-navy-800/10 dark:bg-brown-500/20 px-1.5 py-0.5 rounded">나</span></div><p class="text-xs text-slate-500 mt-1">방 코드: <span id="homeCurrentRoomCode" class="font-mono font-bold">----</span></p></div>
+</div>
+<div><h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">참가한 멤버 (<span id="participantCount">0</span>명)</h4><div id="participantsList" class="space-y-2"></div></div>
+</section>
+
+<section id="tabContentChat" class="hidden flex-1 flex-col h-full overflow-hidden">
+<div id="chatListView" class="flex-1 flex flex-col h-full overflow-hidden">
+<header class="bg-white/90 dark:bg-darkbg-900 border-b border-ivory-300 dark:border-neutral-800 px-4 py-3 flex justify-between"><h3 class="font-bold text-sm">채팅 목록</h3><button onclick="openCreateSubChatModal()" class="text-xs bg-navy-800 dark:bg-brown-500 text-white px-2.5 py-1.5 rounded-lg"><i class="fa-solid fa-plus mr-1"></i>소그룹 생성</button></header>
+<div id="chatRoomsList" class="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-2"></div></div>
+<div id="chatDetailView" class="hidden flex-1 flex-col h-full overflow-hidden">
+<header class="bg-white/90 dark:bg-darkbg-900 border-b border-ivory-300 dark:border-neutral-800 px-4 py-2.5 flex justify-between"><div class="flex items-center gap-3"><button onclick="closeChatDetail()"><i class="fa-solid fa-chevron-left"></i></button><div><h3 id="activeChatTitle" class="font-bold text-xs"># 전체 채팅</h3><span id="activeChatSub" class="text-[9px] text-slate-500"></span></div></div><button id="manageSubChatBtn" onclick="openManageSubChatModal()" class="hidden text-[10px] px-2 py-1 rounded-lg bg-ivory-100 dark:bg-darkbg-800"><i class="fa-solid fa-user-plus mr-1"></i>멤버</button></header>
+<div id="chatMessages" class="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3"></div>
+<div id="attachedMediaBar" class="hidden px-4 py-2 bg-white dark:bg-darkbg-900 border-t text-xs"><span id="attachedMediaText"></span><button onclick="clearAttachment()" class="float-right text-rose-500"><i class="fa-solid fa-xmark"></i></button></div>
+<div class="p-2.5 bg-white dark:bg-darkbg-900 border-t"><form onsubmit="sendChatMessage(event)" class="flex gap-1.5 items-center">
+<button type="button" onclick="openMediaPicker()" class="shrink-0 w-9 h-9 rounded-xl bg-ivory-100 dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 text-slate-600 dark:text-neutral-300"><i class="fa-regular fa-image"></i></button>
+<button type="button" onclick="openSoundboard()" class="shrink-0 w-9 h-9 rounded-xl bg-ivory-100 dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 text-slate-600 dark:text-neutral-300" title="사운드보드"><i class="fa-solid fa-volume-high"></i></button>
+<input type="text" id="chatInput" placeholder="메시지 입력..." class="flex-1 bg-ivory-100 dark:bg-darkbg-950 border border-ivory-300 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs"><button class="bg-navy-800 dark:bg-brown-500 text-white p-2 rounded-xl w-8 h-8"><i class="fa-solid fa-paper-plane"></i></button></form></div>
+</div></section>
+
+<section id="tabContentSettings" class="hidden flex-1 p-5 overflow-y-auto custom-scrollbar space-y-5">
+<h3 class="text-sm font-bold">채팅 및 앱 설정</h3>
+<div class="bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 rounded-2xl p-4 space-y-4">
+<div class="flex items-center justify-between"><span class="text-xs">프로필 사진 변경</span><label class="bg-navy-800 dark:bg-brown-500 text-white px-3 py-1.5 rounded-lg text-xs cursor-pointer">사진 선택<input type="file" accept="image/*" class="hidden" onchange="changeProfileImage(event)"></label></div>
+<div class="flex items-center justify-between border-t pt-3"><span id="themeModeLabel" class="text-xs">다크 모드</span><label class="switch"><input type="checkbox" id="themeToggleSwitch" onchange="toggleDarkMode(this.checked)"><span class="slider"></span></label></div>
+</div>
+<div class="bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 rounded-2xl p-4 space-y-3">
+  <div class="flex items-center justify-between"><h4 class="text-xs font-bold">참여 중인 방</h4><span id="settingsRoomCount" class="text-[10px] text-slate-400"></span></div>
+  <div id="settingsJoinedRooms" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar"></div>
+  <button type="button" onclick="showScreen('screenJoinRoom')" class="w-full bg-navy-800 dark:bg-brown-500 text-white py-3 rounded-xl text-xs font-semibold">
+    <i class="fa-solid fa-right-to-bracket mr-2"></i>다른 방 참가하기
+  </button>
+</div>
+<button onclick="confirmLeaveRoom()" class="w-full bg-rose-500/10 text-rose-600 py-3.5 rounded-xl text-xs border border-rose-500/20">현재 방 나가기</button>
+<button id="deleteCurrentRoomBtn" onclick="serverDeleteCurrentRoom()" class="hidden w-full bg-rose-600 text-white py-3.5 rounded-xl text-xs font-semibold border border-rose-700"><i class="fa-solid fa-trash mr-2"></i>방 삭제</button>
+</section>
+
+<nav class="bg-white dark:bg-darkbg-900 border-t border-ivory-300 dark:border-neutral-800 flex justify-around py-2">
+<button onclick="switchTab('home')" id="navHome" class="flex flex-col items-center text-navy-800 dark:text-brown-400 text-xs"><i class="fa-solid fa-house text-base"></i>홈</button>
+<button onclick="switchTab('chat')" id="navChat" class="flex flex-col items-center text-slate-400 text-xs"><i class="fa-solid fa-comment text-base"></i>채팅</button>
+<button onclick="switchTab('settings')" id="navSettings" class="flex flex-col items-center text-slate-400 text-xs"><i class="fa-solid fa-gear text-base"></i>설정</button>
+</nav>
+</div>
+
+<div id="modalSoundboard" class="hidden absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center p-3">
+<div class="modal-card bg-white dark:bg-darkbg-900 rounded-2xl w-full max-w-md p-4 shadow-2xl max-h-[78%] overflow-y-auto custom-scrollbar">
+<div class="flex items-center justify-between mb-3"><div><h3 class="text-sm font-bold">사운드보드</h3><p class="text-[10px] text-slate-500">짧은 소리를 채팅방에서 함께 재생합니다.</p></div><button onclick="closeSoundboard()" class="w-8 h-8 rounded-full bg-ivory-100 dark:bg-darkbg-800"><i class="fa-solid fa-xmark"></i></button></div>
+<div id="soundboardGrid" class="grid grid-cols-3 gap-2"></div>
+
+<div class="mt-2 text-[9px] text-slate-400">5초 이하 · 5MB 이하 · MP3/WAV/OGG</div>
+</div></div>
+<div id="modalMediaPicker" class="hidden absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+<div class="modal-card bg-white dark:bg-darkbg-900 rounded-2xl w-full max-w-xs p-5 shadow-2xl">
+<h3 class="text-xs font-bold mb-4">미디어 보내기</h3>
+<div class="grid grid-cols-3 gap-2">
+<label class="cursor-pointer rounded-2xl border border-ivory-300 dark:border-neutral-800 bg-ivory-100 dark:bg-darkbg-950 p-4 text-center hover:-translate-y-0.5 transition"><i class="fa-regular fa-image text-2xl mb-2"></i><div class="text-[11px] font-semibold">사진</div><input type="file" accept="image/*" class="hidden" onchange="handleMediaFile(event,'image')"></label>
+<label class="cursor-pointer rounded-2xl border border-ivory-300 dark:border-neutral-800 bg-ivory-100 dark:bg-darkbg-950 p-4 text-center hover:-translate-y-0.5 transition"><i class="fa-solid fa-video text-2xl mb-2"></i><div class="text-[11px] font-semibold">동영상</div><input type="file" accept="video/*" class="hidden" onchange="handleMediaFile(event,'video')"></label>
+<label class="cursor-pointer rounded-2xl border border-ivory-300 dark:border-neutral-800 bg-ivory-100 dark:bg-darkbg-950 p-4 text-center hover:-translate-y-0.5 transition"><i class="fa-solid fa-microphone text-2xl mb-2"></i><div class="text-[11px] font-semibold">음성</div><input type="file" accept="audio/*" class="hidden" onchange="handleMediaFile(event,'audio')"></label>
+</div>
+<button onclick="closeMediaPicker()" class="w-full mt-4 py-2 text-xs text-red-500">취소</button>
+</div></div>
+<div id="modalCreateSubChat" class="hidden absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div class="modal-card bg-white dark:bg-darkbg-900 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl">
+<div id="subChatStepMembers">
+<h3 class="text-sm font-bold">초대할 친구를 선택하세요.</h3><p class="text-[10px] text-slate-500 mt-1">소그룹 채팅에 참여할 친구를 선택해주세요.</p>
+<div id="memberSelectList" class="max-h-52 overflow-y-auto space-y-1 text-xs mt-3"></div>
+<div class="flex gap-2 mt-3"><button onclick="closeSubChatModal()" class="flex-1 py-2 bg-ivory-200 dark:bg-darkbg-800 text-slate-700 dark:text-slate-200 border border-ivory-300 dark:border-neutral-700 rounded-xl text-xs">취소</button><button onclick="goToSubChatNameStep()" class="flex-1 py-2 bg-brown-600 hover:bg-brown-900 text-white rounded-xl text-xs shadow-sm">다음</button></div>
+</div>
+<div id="subChatStepName" class="hidden">
+<h3 class="text-sm font-bold">소그룹 채팅방 이름을 정해주세요.</h3><p class="text-[10px] text-slate-500 mt-1">친구를 초대했어요. 이제 이름을 설정해주세요.</p>
+<input id="subChatNameInput" placeholder="채팅방 이름" class="w-full mt-3 bg-ivory-100 dark:bg-darkbg-950 border rounded-xl px-3 py-2 text-xs">
+<div class="flex gap-2 mt-3"><button onclick="backToSubChatMembersStep()" class="flex-1 py-2 bg-ivory-200 dark:bg-darkbg-800 text-slate-700 dark:text-slate-200 border border-ivory-300 dark:border-neutral-700 rounded-xl text-xs">이전</button><button onclick="submitCreateSubChat()" class="flex-1 py-2 bg-brown-600 hover:bg-brown-900 text-white rounded-xl text-xs shadow-sm">만들기</button></div>
+</div>
+</div></div>
+<div id="modalManageSubChat" class="hidden absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div class="modal-card bg-white dark:bg-darkbg-900 rounded-2xl w-full max-w-xs p-5 space-y-4 shadow-2xl">
+<h3 class="text-xs font-bold">소그룹 멤버 관리</h3><p class="text-[10px] text-slate-500">초대할 친구를 선택하세요.</p>
+<div id="manageMemberList" class="max-h-44 overflow-y-auto space-y-1 text-xs"></div>
+<div class="flex gap-2"><button onclick="closeManageSubChatModal()" class="flex-1 py-2 bg-ivory-200 dark:bg-darkbg-800 text-slate-700 dark:text-slate-200 border border-ivory-300 dark:border-neutral-700 rounded-xl text-xs">취소</button><button onclick="saveManageSubChat()" class="flex-1 py-2 bg-brown-600 hover:bg-brown-900 text-white rounded-xl text-xs">저장</button></div>
+</div></div>
+</div>
+
+<script>
+const KEY_USERS='azit_users_v1',KEY_SESSION='azit_session_v1',KEY_STATE='azit_state_v1',KEY_THEME='azit_theme_v1';
+const SUPABASE_URL='https://tszelfaxfkrwmbllpmcz.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_rYPMxsvqRuQ_MjwlqSsRZQ_1F5cmaZr';
+const azitSupabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+
+/* AZIT 1.0.17 — realtime recovery and integration fixes */
+function azitExplainError(error){
+  const raw=String(error?.message||error?.details||error||'알 수 없는 오류');
+  const lower=raw.toLowerCase();
+  if(lower.includes('row-level security')||lower.includes('violates row-level security')||lower.includes('permission denied')){
+    return '접근 권한이 없습니다. 방 참여 여부와 Supabase RLS 정책을 확인해주세요. ('+raw+')';
+  }
+  if(lower.includes('schema cache')||lower.includes('could not find the table')||lower.includes('could not find the column')){
+    return 'Supabase 테이블/컬럼 정보가 반영되지 않았습니다. 설정 SQL 실행 여부와 스키마 새로고침을 확인해주세요. ('+raw+')';
+  }
+  if(lower.includes('failed to fetch')||lower.includes('network')||lower.includes('load failed')){
+    return '서버 연결에 실패했습니다. 인터넷 연결과 Supabase 프로젝트 상태를 확인한 뒤 다시 시도해주세요.';
+  }
+  if(lower.includes('duplicate key')||lower.includes('already exists')){
+    return '이미 존재하는 항목입니다. 목록을 새로고침한 뒤 다시 시도해주세요. ('+raw+')';
+  }
+  return raw;
+}
+let authMode='login',currentUser=null,currentRoom=null,pendingMedia=null;
+let state={rooms:{},users:{}}; localStorage.removeItem(KEY_STATE);
+let subChatChannels=[],activeChatChannel='전체 채팅';
+let soundboardSounds=[];
+let soundboardAudio=null;
+
+function saveState(){localStorage.setItem(KEY_STATE,JSON.stringify(state))}
+function saveSession(){localStorage.setItem(KEY_SESSION,JSON.stringify(currentUser))}
+function loadSession(){try{return JSON.parse(localStorage.getItem(KEY_SESSION))}catch{return null}}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+window.onload=async()=>{
+  rerollCode();
+  toggleDarkMode(localStorage.getItem(KEY_THEME)==='dark');
+  const {data:{session}}=await azitSupabase.auth.getSession();
+  if(session?.user){
+    const profile=await ensureProfile(session.user);
+    if(profile){
+      currentUser=profile;
+      saveSession();
+      showMainMenu();
+    }else{
+      await azitSupabase.auth.signOut();
+      showScreen('screenAuth');
+    }
+  }else{
+    localStorage.removeItem(KEY_SESSION);
+    showScreen('screenAuth');
+  }
+};
+
+function showScreen(id){
+ ['screenAuth','screenMainMenu','screenCreateRoom','screenJoinRoom','screenInRoom'].forEach(x=>{
+  const e=document.getElementById(x);e.classList.toggle('hidden',x!==id);
+  if(x===id){e.classList.remove('screen-enter');void e.offsetWidth;e.classList.add('screen-enter')}
+  if(x==='screenInRoom')e.classList.toggle('flex',x===id);
+ });
+}
+function showMainMenu(){
+ document.getElementById('welcomeText').textContent=`${currentUser.name}님, 다시 오셨네요.`;
+ updateProfile();
+ renderExistingRooms();
+ showScreen('screenMainMenu');
+}
+function renderExistingRooms(){
+ const section=document.getElementById('existingRoomsSection'),list=document.getElementById('existingRoomsList');
+ const rooms=Object.values(state.rooms).filter(r=>Array.isArray(r.members)&&r.members.includes(currentUser.email));
+ section.classList.toggle('hidden',rooms.length===0);
+ document.getElementById('existingRoomCount').textContent=rooms.length?`${rooms.length}개`:'';
+ list.innerHTML=rooms.map(r=>`<button onclick="enterRoomByCode('${esc(r.code)}')" class="w-full text-left bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 rounded-xl p-3 flex items-center gap-3 hover:-translate-y-0.5 transition">
+ <div class="w-9 h-9 rounded-xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center"><i class="fa-solid fa-comments"></i></div><div class="min-w-0"><div class="text-xs font-bold truncate">${esc(r.name)}</div><div class="text-[10px] text-slate-400 font-mono">${esc(r.code)} · ${r.members.length}명</div></div></button>`).join('');
+}
+function enterRoomByCode(code){const room=state.rooms[code];if(room)enterRoom(room)}
+function switchAuthMode(mode){
+ authMode=mode;
+ document.getElementById('displayNameGroup').classList.toggle('hidden',mode==='login');
+ document.getElementById('authSubmit').textContent=mode==='login'?'로그인':'회원가입';
+ document.getElementById('authMessage').textContent='';
+ document.getElementById('tabLogin').className=mode==='login'?'flex-1 py-2 rounded-lg bg-navy-800 dark:bg-brown-500 text-white shadow-sm':'flex-1 py-2 rounded-lg text-slate-500';
+ document.getElementById('tabRegister').className=mode==='register'?'flex-1 py-2 rounded-lg bg-navy-800 dark:bg-brown-500 text-white shadow-sm':'flex-1 py-2 rounded-lg text-slate-500';
+}
+async function ensureProfile(user){
+ try{
+  const {data,error}=await azitSupabase.from('profiles').select('id,nickname,avatar_url,created_at').eq('id',user.id).maybeSingle();
+  if(error)throw error;
+  if(data)return {id:user.id,email:user.email,name:data.nickname||user.user_metadata?.nickname||user.email.split('@')[0],avatar:data.avatar_url||null};
+  const nickname=user.user_metadata?.nickname||user.email.split('@')[0];
+  const {data:created,error:createError}=await azitSupabase.from('profiles').insert({id:user.id,nickname,avatar_url:null}).select('id,nickname,avatar_url,created_at').single();
+  if(createError)throw createError;
+  return {id:user.id,email:user.email,name:created.nickname,avatar:created.avatar_url||null};
+ }catch(err){
+  console.error(err);
+  document.getElementById('authMessage').textContent='프로필을 불러오지 못했습니다: '+azitExplainError(err);
+  return null;
+ }
+}
+async function handleAuth(e){
+ e.preventDefault();
+ const email=document.getElementById('authEmail').value.trim().toLowerCase();
+ const password=document.getElementById('authPassword').value;
+ const name=document.getElementById('authDisplayName').value.trim();
+ const msg=document.getElementById('authMessage');
+ const submit=document.getElementById('authSubmit');
+ msg.textContent='';
+ submit.disabled=true;
+ submit.style.opacity='.65';
+ try{
+  if(authMode==='register'){
+   if(password.length<6){msg.textContent='비밀번호는 6자 이상 입력해주세요.';return}
+   if(!name){msg.textContent='닉네임을 입력해주세요.';return}
+   const {data,error}=await azitSupabase.auth.signUp({email,password,options:{data:{nickname:name}}});
+   if(error)throw error;
+   if(data.session&&data.user){
+    const profile=await ensureProfile(data.user);
+    if(!profile)return;
+    currentUser=profile;saveSession();showMainMenu();
+   }else{
+    msg.textContent='가입 완료! 이메일 인증 후 로그인해주세요.';
+    switchAuthMode('login');
+   }
+  }else{
+   const {data,error}=await azitSupabase.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   const profile=await ensureProfile(data.user);
+   if(!profile)return;
+   currentUser=profile;saveSession();showMainMenu();
+  }
+ }catch(err){
+  console.error(err);
+  const text=String(err?.message||'');
+  if(text.toLowerCase().includes('invalid login credentials'))msg.textContent='이메일 또는 비밀번호가 올바르지 않습니다.';
+  else if(text.toLowerCase().includes('user already registered'))msg.textContent='이미 가입된 이메일입니다.';
+  else msg.textContent=text||'로그인에 실패했습니다.';
+ }finally{
+  submit.disabled=false;
+  submit.style.opacity='';
+ }
+}
+async function handleLogout(){
+ await azitSupabase.auth.signOut();
+ localStorage.removeItem(KEY_SESSION);
+ currentUser=null;
+ showScreen('screenAuth');
+ document.getElementById('authPassword').value='';
+}
+function updateProfile(){
+ document.getElementById('homeMyName').textContent=currentUser.name;
+ const a=document.getElementById('homeMyAvatar');
+ if(currentUser.avatar){a.style.backgroundImage=`url("${currentUser.avatar}")`;a.textContent=''}else{a.style.backgroundImage='';a.textContent=currentUser.name.charAt(0)}
+}
+function rerollCode(){
+ const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';let c='';
+ for(let i=0;i<4;i++)c+=chars[Math.floor(Math.random()*chars.length)];
+ document.getElementById('newRoomCode').value=c;
+}
+function handleCreateRoom(e){
+ e.preventDefault();
+ const name=document.getElementById('newRoomName').value.trim(),code=document.getElementById('newRoomCode').value;
+ if(state.rooms[code]){alert('이미 사용 중인 코드입니다. 다시 생성해주세요.');rerollCode();return}
+ state.rooms[code]={name,code,owner:currentUser.email,members:[currentUser.email],channels:{'전체 채팅':[]},channelMembers:{'전체 채팅':[currentUser.email]}};
+ saveState();enterRoom(state.rooms[code]);
+}
+function handleJoinRoom(e){
+ e.preventDefault();
+ const code=document.getElementById('joinRoomCode').value.trim().toUpperCase();
+ const room=state.rooms[code];
+ if(!room){alert('존재하지 않는 방 코드입니다.');return}
+ if(!room.members.includes(currentUser.email))room.members.push(currentUser.email);
+ saveState();enterRoom(room);
+}
+function enterRoom(room){
+ currentRoom=room;
+ if(!currentRoom.channels)currentRoom.channels={'전체 채팅':[]};
+ if(!currentRoom.channelMembers)currentRoom.channelMembers={'전체 채팅':currentRoom.members||[]};
+ if(!currentRoom.soundboard)currentRoom.soundboard=[];
+ activeChatChannel='전체 채팅';
+ soundboardSounds=currentRoom.soundboard;
+ saveState();
+ document.getElementById('homeCurrentRoomCode').textContent=room.code;
+ subChatChannels=Object.keys(room.channels).map(name=>({name,members:room.members}));
+ renderParticipants();renderChatRoomList();showScreen('screenInRoom');switchTab('home');
+}
+function leaveRoom(){
+ if(!currentRoom||!currentUser)return;
+ const room=state.rooms[currentRoom.code];
+ if(room){
+   room.members=Array.isArray(room.members)?room.members.filter(email=>email!==currentUser.email):[];
+   saveState();
+ }
+ currentRoom=null;
+ showMainMenu();
+}
+function confirmLeaveRoom(){if(confirm('현재 방에서 나가시겠습니까?\n나가면 참여 중인 방 목록에서도 사라집니다.'))leaveRoom()}
+function renderSettingsJoinedRooms(){
+ const box=document.getElementById('settingsJoinedRooms');
+ if(!box)return;
+ const rooms=Object.values(state.rooms).filter(r=>Array.isArray(r.members)&&r.members.includes(currentUser.email));
+ document.getElementById('settingsRoomCount').textContent=`${rooms.length}개`;
+ box.innerHTML=rooms.length?rooms.map(r=>`<button onclick="enterRoomByCode('${esc(r.code)}')" class="w-full text-left p-3 rounded-xl border ${currentRoom&&currentRoom.code===r.code?'border-navy-800/30 dark:border-brown-500/40 bg-navy-800/5 dark:bg-brown-500/10':'border-ivory-300 dark:border-neutral-800 bg-ivory-50 dark:bg-darkbg-950'} hover:-translate-y-0.5 transition flex items-center gap-3">
+ <div class="w-9 h-9 rounded-xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-comments"></i></div>
+ <div class="min-w-0 flex-1"><div class="text-xs font-bold truncate">${esc(r.name)}</div><div class="text-[10px] text-slate-400 font-mono">${esc(r.code)} · ${r.members.length}명</div></div>
+ ${currentRoom&&currentRoom.code===r.code?'<span class="text-[9px] text-emerald-600">현재 방</span>':'<i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>'}
+ </button>`).join(''):'<div class="text-[11px] text-slate-400 text-center py-4">참여 중인 방이 없습니다.</div>';
+}
+function renderParticipants(){
+ const list=document.getElementById('participantsList');list.innerHTML='';
+ document.getElementById('participantCount').textContent=currentRoom.members.length;
+ currentRoom.members.forEach(email=>{
+  const u=getUser(email)||{name:email};const me=email===currentUser.email;
+  const avatar=u.avatar?`<div class="w-8 h-8 rounded-full bg-cover bg-center border border-ivory-300 dark:border-neutral-700 shrink-0" style="background-image:url("${u.avatar}")"></div>`:`<div class="w-8 h-8 rounded-full bg-navy-800 dark:bg-brown-500 text-white flex items-center justify-center font-bold shrink-0">${esc((u.name||'?').charAt(0))}</div>`;
+  list.innerHTML+=`<div class="bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 p-3 rounded-xl flex justify-between text-xs"><div class="flex items-center gap-3">${avatar}<span class="font-medium">${esc(u.name)} ${me?'(나)':''}</span></div><span class="text-[10px] text-emerald-600">참여 중</span></div>`;
+ });
+}
+function getUser(email){return JSON.parse(localStorage.getItem(KEY_USERS)||'{}')[email]}
+function switchTab(t){
+ ['home','chat','settings'].forEach(x=>{
+  const c=document.getElementById('tabContent'+x.charAt(0).toUpperCase()+x.slice(1));
+  const n=document.getElementById('nav'+x.charAt(0).toUpperCase()+x.slice(1));
+  c.classList.toggle('hidden',x!==t);if(x==='chat')c.classList.toggle('flex',x===t);
+  n.className=x===t?'flex flex-col items-center text-navy-800 dark:text-brown-400 text-xs':'flex flex-col items-center text-slate-400 text-xs';
+ });
+ if(t==='chat')closeChatDetail();
+ if(t==='settings')renderSettingsJoinedRooms();
+}
+function renderChatRoomList(){
+ const box=document.getElementById('chatRoomsList');box.innerHTML='';
+ Object.keys(currentRoom.channels).forEach(name=>{
+  const allowed=(currentRoom.channelMembers?.[name]||currentRoom.members).includes(currentUser.email); if(!allowed)return;
+  const msgs=currentRoom.channels[name],last=msgs[msgs.length-1],memberCount=(currentRoom.channelMembers?.[name]||currentRoom.members).length;
+  box.innerHTML+=`<div onclick="openChatDetail('${esc(name)}')" class="bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 p-3.5 rounded-2xl cursor-pointer"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-2xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center"><i class="fa-solid ${name==='전체 채팅'?'fa-comments':'fa-hashtag'}"></i></div><div class="overflow-hidden"><h4 class="font-bold text-xs truncate">${esc(name)}</h4><p class="text-[11px] text-slate-500 truncate">${name==='전체 채팅'?'전체 채팅 · '+memberCount+'명':memberCount+'명 · '+esc(last?.text||'새 대화를 시작해보세요.')}</p></div></div></div>`;
+ });
+}
+function openChatDetail(name){
+ activeChatChannel=name;document.getElementById('activeChatTitle').textContent='# '+name;
+ document.getElementById('activeChatSub').textContent=name==='전체 채팅'?'참여자 전원':`${(currentRoom.channelMembers?.[name]||[]).length}명 참여`;
+ const manage=document.getElementById('manageSubChatBtn'); manage.classList.toggle('hidden',name==='전체 채팅'||currentRoom?.channelCreators?.[name]!==currentUser?.id);
+ document.getElementById('chatListView').classList.add('hidden');document.getElementById('chatDetailView').classList.remove('hidden');document.getElementById('chatDetailView').classList.add('flex');renderMessages();
+}
+function closeChatDetail(){document.getElementById('chatDetailView').classList.add('hidden');document.getElementById('chatDetailView').classList.remove('flex');document.getElementById('chatListView').classList.remove('hidden');renderChatRoomList()}
+function azitMessageDateKey(message){
+ const raw=message?.createdAt||message?.created_at;
+ if(!raw)return null;
+ const d=new Date(raw);if(Number.isNaN(d.getTime()))return null;
+ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function azitMessageDateLabel(dateKey){
+ const [y,m,d]=dateKey.split('-').map(Number);
+ return `${y}년 ${m}월 ${d}일`;
+}
+function renderMessages(){
+ const box=document.getElementById('chatMessages'),msgs=currentRoom?.channels?.[activeChatChannel]||[];box.innerHTML='';
+ if(!msgs.length){box.innerHTML='<div class="text-center text-slate-400 text-xs py-8">아직 메시지가 없습니다.</div>';return}
+ const groups=[];msgs.forEach(m=>{const dateKey=azitMessageDateKey(m);const prev=groups[groups.length-1];if(prev&&prev.sender===m.sender&&prev.time===m.time&&prev.dateKey===dateKey)prev.items.push(m);else groups.push({sender:m.sender,time:m.time,dateKey,items:[m]})});
+ let previousDateKey=null;
+ groups.forEach(g=>{
+  if(g.dateKey&&g.dateKey!==previousDateKey){
+   const divider=document.createElement('div');divider.className='flex justify-center py-3';
+   divider.innerHTML=`<span class="rounded-full bg-slate-200/80 dark:bg-neutral-800 text-slate-500 dark:text-slate-300 text-[10px] px-3 py-1.5">${azitMessageDateLabel(g.dateKey)}</span>`;
+   box.appendChild(divider);
+  }
+  if(g.dateKey)previousDateKey=g.dateKey;
+  const me=g.sender===currentUser.email,u=getUser(g.sender)||{name:g.sender};
+  const wrap=document.createElement('div');wrap.className=`message-enter flex flex-col ${me?'items-end':'items-start'} gap-1`;
+  if(!me){const avatar=u.avatar?`<div class="w-7 h-7 rounded-full bg-cover bg-center border border-ivory-300 dark:border-neutral-800" style="background-image:url("${u.avatar}")"></div>`:`<div class="w-7 h-7 rounded-full bg-navy-800 dark:bg-brown-500 text-white flex items-center justify-center text-[10px] font-bold">${esc((u.name||'?').charAt(0))}</div>`;wrap.innerHTML=`<div class="flex items-center gap-2 pl-1 mb-0.5">${avatar}<span class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">${esc(u.name)}</span><span class="text-[9px] text-slate-400">${esc(g.time)}</span></div>`}
+  g.items.forEach((m,i)=>{const row=document.createElement('div');row.className=`flex items-end gap-1.5 max-w-[82%] ${me?'flex-row-reverse':'flex-row pl-9'}`;const mediaHtml=m.media?renderMedia(m.media):'';
+  row.innerHTML=`<div class="chat-bubble ${me?'bg-navy-800 dark:bg-brown-500 text-white':'bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800'} rounded-2xl ${me?'rounded-br-sm':'rounded-bl-sm'} px-3 py-2 text-xs break-words">${mediaHtml}${m.text?`<div class="${mediaHtml?'mt-2':''}">${esc(m.text)}</div>`:''}</div>${me&&i===g.items.length-1?`<span class="text-[9px] text-slate-400 shrink-0">${esc(g.time)}</span>`:''}`;wrap.appendChild(row)});
+  box.appendChild(wrap);
+ });box.scrollTop=box.scrollHeight;
+}
+function sendChatMessage(e){
+ e.preventDefault();const input=document.getElementById('chatInput'),text=input.value.trim();
+ if(!(currentRoom.channelMembers?.[activeChatChannel]||currentRoom.members).includes(currentUser.email)){alert('이 소그룹의 멤버가 아닙니다.');return;}
+ if(!text&&!pendingMedia)return;
+ const now=new Date(),time=now.toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'});
+ currentRoom.channels[activeChatChannel].push({sender:currentUser.email,text,time,createdAt:now.toISOString(),media:pendingMedia});
+ saveState();input.value='';pendingMedia=null;document.getElementById('attachedMediaBar').classList.add('hidden');renderMessages();renderChatRoomList();
+}
+function openMediaPicker(){const m=document.getElementById('modalMediaPicker');m.classList.remove('hidden');const card=m.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter')}
+function closeMediaPicker(){document.getElementById('modalMediaPicker').classList.add('hidden')}
+function handleMediaFile(e,type){
+ const file=e.target.files[0];if(!file)return;
+ const maxBytes=20*1024*1024;
+ if(file.size>maxBytes){alert('파일은 20MB 이하만 첨부할 수 있습니다.');e.target.value='';return;}
+ const allowed=type==='image'?file.type.startsWith('image/'):type==='video'?file.type.startsWith('video/'):file.type.startsWith('audio/');
+ if(!allowed){alert('선택한 파일 형식이 올바르지 않습니다.');e.target.value='';return;}
+ const reader=new FileReader();reader.onload=x=>{pendingMedia={type,name:file.name,mime:file.type,file,data:x.target.result};document.getElementById('attachedMediaText').textContent=`${type==='image'?'사진':type==='video'?'동영상':'음성'} 첨부됨 · ${file.name}`;document.getElementById('attachedMediaBar').classList.remove('hidden');closeMediaPicker();e.target.value='';};reader.readAsDataURL(file);
+}
+function clearAttachment(){pendingMedia=null;document.getElementById('attachedMediaBar').classList.add('hidden')}
+function renderMedia(media){
+ if(media.type==='image')return `<img src="${media.data}" alt="첨부 사진" class="max-w-full max-h-56 rounded-xl object-cover cursor-pointer" onclick="window.open(this.src,'_blank')">`;
+ if(media.type==='video')return `<video src="${media.data}" controls playsinline class="max-w-full max-h-56 rounded-xl"></video>`;
+ return `<audio src="${media.data}" controls class="max-w-full"></audio>`;
+}
+function openCreateSubChatModal(){
+ const list=document.getElementById('memberSelectList');list.innerHTML='';
+ currentRoom.members.forEach(email=>{const u=getUser(email);if(email!==currentUser.email)list.innerHTML+=`<label class="flex items-center gap-2 p-2 rounded-xl hover:bg-ivory-100 dark:hover:bg-darkbg-950 cursor-pointer"><input type="checkbox" value="${esc(email)}" class="subchat-member-checkbox"><span>${esc(u?.name||email)}</span></label>`});
+ document.getElementById('subChatNameInput').value='';
+ document.getElementById('subChatStepMembers').classList.remove('hidden');
+ document.getElementById('subChatStepName').classList.add('hidden');
+ const modal=document.getElementById('modalCreateSubChat');modal.classList.remove('hidden');const card=modal.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter');
+}
+function closeSubChatModal(){document.getElementById('modalCreateSubChat').classList.add('hidden')}
+function goToSubChatNameStep(){
+ const selected=[...document.querySelectorAll('.subchat-member-checkbox:checked')];
+ if(!selected.length){alert('초대할 친구를 한 명 이상 선택해주세요.');return}
+ document.getElementById('subChatStepMembers').classList.add('hidden');
+ document.getElementById('subChatStepName').classList.remove('hidden');
+ document.getElementById('subChatNameInput').focus();
+}
+function backToSubChatMembersStep(){
+ document.getElementById('subChatStepName').classList.add('hidden');
+ document.getElementById('subChatStepMembers').classList.remove('hidden');
+}
+function submitCreateSubChat(){
+ const name=document.getElementById('subChatNameInput').value.trim();if(!name){alert('채팅방 이름을 입력해주세요.');return}
+ if(currentRoom.channels[name]){alert('이미 존재하는 채팅방입니다.');return}
+ const selected=[...document.querySelectorAll('.subchat-member-checkbox:checked')].map(x=>x.value);
+ if(!selected.length){alert('초대할 친구를 한 명 이상 선택해주세요.');return}
+ const members=[currentUser.email,...selected.filter(e=>e!==currentUser.email)];
+ currentRoom.channels[name]=[]; currentRoom.channelMembers=currentRoom.channelMembers||{}; currentRoom.channelMembers[name]=members;
+ saveState();closeSubChatModal();renderChatRoomList();
+}
+function openManageSubChatModal(){
+ if(activeChatChannel==='전체 채팅')return;
+ const list=document.getElementById('manageMemberList'); const members=currentRoom.channelMembers?.[activeChatChannel]||[]; list.innerHTML='';
+ currentRoom.members.forEach(email=>{const u=getUser(email); const checked=members.includes(email)?'checked':''; const disabled=email===currentUser.email?'disabled':''; list.innerHTML+=`<label class="flex items-center gap-2 p-1.5"><input type="checkbox" value="${esc(email)}" class="manage-subchat-member-checkbox" ${checked} ${disabled}><span>${esc(u?.name||email)}${email===currentUser.email?' (나)':''}</span></label>`});
+ const modal=document.getElementById('modalManageSubChat');modal.classList.remove('hidden');const card=modal.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter');
+}
+function closeManageSubChatModal(){document.getElementById('modalManageSubChat').classList.add('hidden')}
+function saveManageSubChat(){
+ const selected=[...document.querySelectorAll('.manage-subchat-member-checkbox:checked')].map(x=>x.value);
+ if(!selected.includes(currentUser.email))selected.push(currentUser.email);
+ if(selected.length<2){alert('소그룹에는 나를 포함해 한 명 이상의 친구가 필요합니다.');return}
+ currentRoom.channelMembers[activeChatChannel]=selected;saveState();closeManageSubChatModal();
+ if(!selected.includes(currentUser.email)){closeChatDetail();return;}
+ document.getElementById('activeChatSub').textContent=`${selected.length}명 참여`;renderChatRoomList();
+}
+
+function saveSoundboard(){
+ if(currentRoom)currentRoom.soundboard=soundboardSounds;
+}
+function openSoundboard(){
+ if(typeof azitIsActiveChannelMember==='function' ? !azitIsActiveChannelMember(activeChatChannel) : !(currentRoom.channelMembers?.[activeChatChannel]||currentRoom.members).includes(currentUser.email)){alert('이 채팅방의 멤버가 아닙니다.');return;}
+ renderSoundboard();const m=document.getElementById('modalSoundboard');m.classList.remove('hidden');const card=m.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter');
+}
+function closeSoundboard(){document.getElementById('modalSoundboard').classList.add('hidden');}
+function renderSoundboard(){
+ const grid=document.getElementById('soundboardGrid');
+ if(!grid)return;
+ grid.innerHTML='';
+ const add=document.createElement('button');
+ add.type='button';
+ add.className='min-h-20 rounded-2xl border-2 border-dashed border-ivory-300 dark:border-neutral-700 bg-transparent p-2.5 text-center hover:bg-ivory-100 dark:hover:bg-darkbg-950 transition';
+ add.innerHTML='<i class="fa-solid fa-plus text-lg mb-1"></i><div class="text-[10px] font-semibold">사운드보드 추가하기</div>';
+ add.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();addSoundboardSound();});
+ grid.appendChild(add);
+ soundboardSounds.forEach((s,i)=>{
+   const b=document.createElement('button');
+   b.type='button';
+   b.className='relative min-h-20 rounded-2xl border border-ivory-300 dark:border-neutral-800 bg-ivory-100 dark:bg-darkbg-950 p-2.5 text-left hover:-translate-y-0.5 active:translate-y-1 active:scale-95 transition';
+   b.innerHTML=`<div class="w-8 h-8 rounded-xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center mb-2"><i class="fa-solid fa-volume-high text-sm"></i></div><div class="text-[11px] font-semibold truncate pr-4">${esc(s.name)}</div><span class="absolute right-2 top-2 text-[9px] text-slate-400">${i+1}</span>`;
+   b.addEventListener('click',function(e){
+     e.preventDefault(); e.stopPropagation();
+     b.classList.add('translate-y-1','scale-95');
+     closeSoundboard();
+     playSoundboardSound(s);
+     setTimeout(()=>b.classList.remove('translate-y-1','scale-95'),180);
+   });
+   grid.appendChild(b);
+ });
+}
+function playSoundboardSound(s){
+ if(soundboardAudio){soundboardAudio.pause();soundboardAudio.currentTime=0;}
+ soundboardAudio=new Audio(s.data);soundboardAudio.volume=1;soundboardAudio.play().catch(()=>{});
+}
+function addSoundboardSound(){
+ const input=document.createElement('input');
+ input.type='file';
+ input.accept='audio/*,.mp3,.wav,.ogg,.m4a';
+ input.style.display='none';
+ document.body.appendChild(input);
+ input.addEventListener('change',function(){
+   const file=input.files && input.files[0];
+   input.remove();
+   if(!file)return;
+   if(file.size>5*1024*1024){alert('사운드 파일은 5MB 이하만 추가할 수 있습니다.');return;}
+   const url=URL.createObjectURL(file);
+   const a=document.createElement('audio');
+   a.preload='metadata';
+   a.onloadedmetadata=function(){
+     const duration=a.duration;
+     URL.revokeObjectURL(url);
+     if(!Number.isFinite(duration)||duration>5.01){alert('사운드보드용 음향은 5초 이하만 추가할 수 있습니다.');return;}
+     const reader=new FileReader();
+     reader.onload=function(e){
+       const defaultName=file.name.replace(/\.[^/.]+$/,'');
+       const nickname=prompt('이 사운드의 별명을 입력하세요.',defaultName);
+       if(nickname===null)return;
+       const name=nickname.trim();
+       if(!name){alert('별명을 입력해주세요.');return;}
+       saveSoundboardFile(file,name).then(sound=>{
+         soundboardSounds.push(sound);
+         saveSoundboard();
+         renderSoundboard();
+       }).catch(err=>{
+         console.error(err);
+         alert('사운드를 서버에 저장하지 못했습니다: '+azitExplainError(err));
+       });
+     };
+     reader.onerror=function(){alert('파일을 읽지 못했습니다.');};
+     reader.readAsDataURL(file);
+   };
+   a.onerror=function(){URL.revokeObjectURL(url);alert('재생할 수 없는 오디오 파일입니다.');};
+   a.src=url;
+ });
+ input.click();
+}
+function changeProfileImage(e){
+ const file=e.target.files[0];if(!file)return;const reader=new FileReader();
+ reader.onload=x=>{currentUser.avatar=x.target.result;let users=JSON.parse(localStorage.getItem(KEY_USERS)||'{}');users[currentUser.email].avatar=currentUser.avatar;localStorage.setItem(KEY_USERS,JSON.stringify(users));saveSession();updateProfile();};reader.readAsDataURL(file);
+}
+function toggleDarkMode(dark){
+ document.getElementById('htmlRoot').classList.toggle('dark',dark);document.getElementById('themeToggleSwitch').checked=dark;
+ document.getElementById('themeModeLabel').textContent=dark?'다크 모드':'화이트 모드';localStorage.setItem(KEY_THEME,dark?'dark':'light');
+}
+
+/* ===== AZIT SERVER SYNC PATCH — server is the single source of truth ===== */
+async function serverListRooms(){
+  const uid=currentUser?.id;if(!uid)return [];
+  // 방 목록은 room_members만 기준으로 한다. 방장이 나간 방을 '소유 방'이라는 이유로 다시 표시하지 않는다.
+  const {data:mine,error:e1}=await azitSupabase.from('room_members').select('room_id').eq('user_id',uid);
+  if(e1)throw e1;
+  const ids=[...new Set((mine||[]).map(x=>x.room_id))];
+  if(!ids.length)return [];
+  const {data:rooms,error:e3}=await azitSupabase.from('rooms').select('*').in('id',ids).order('created_at',{ascending:false});
+  if(e3)throw e3;
+  return rooms||[];
+}
+async function serverRoomByCode(code){
+  const normalized=String(code||'').trim().toUpperCase();
+  if(!normalized)return null;
+  const {data,error}=await azitSupabase.rpc('azit_16_lookup_room_by_code',{p_code:normalized});
+  if(error)throw error;
+  return (Array.isArray(data)?data[0]:data)||null;
+}
+async function azitResolveMedia(media){
+  if(!media||!media.path)return media||null;
+  const {data,error}=await azitSupabase.storage.from('chat-media').createSignedUrl(media.path,60*60);
+  if(error)throw error;
+  return {...media,data:data.signedUrl};
+}
+async function azitUploadChatMedia(media,channelId){
+  if(!media?.file)return media||null;
+  const file=media.file;
+  const safeName=String(file.name||'upload').normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-100)||'upload';
+  const path=`${channelId}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+  const {error}=await azitSupabase.storage.from('chat-media').upload(path,file,{contentType:file.type,upsert:false});
+  if(error)throw error;
+  return {type:media.type,name:file.name,mime:file.type,path};
+}
+
+async function azitResolveSoundboardSound(sound){
+  const {data,error}=await azitSupabase.storage.from('soundboard-media').createSignedUrl(sound.storage_path,60*60);
+  if(error)throw error;
+  return {id:sound.id,name:sound.name,mime:sound.mime_type,path:sound.storage_path,data:data.signedUrl,type:(sound.mime_type||'audio').split('/')[1]||'audio'};
+}
+async function saveSoundboardFile(file,name){
+  if(!currentRoom?.id||!currentUser?.id)throw new Error('현재 방 또는 사용자 정보를 찾지 못했습니다.');
+  const safeName=String(file.name||'sound').normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-80)||'sound';
+  const path=`${currentRoom.id}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+  const {error:uploadError}=await azitSupabase.storage.from('soundboard-media').upload(path,file,{contentType:file.type||'audio/mpeg',upsert:false});
+  if(uploadError)throw uploadError;
+  try{
+    const {data,error}=await azitSupabase.from('soundboard_sounds').insert({room_id:currentRoom.id,name,storage_path:path,mime_type:file.type||'audio/mpeg',created_by:currentUser.id}).select('id,name,storage_path,mime_type').single();
+    if(error)throw error;
+    return await azitResolveSoundboardSound(data);
+  }catch(err){
+    const {error:removeError}=await azitSupabase.storage.from('soundboard-media').remove([path]);
+    if(removeError)console.warn('사운드 업로드 정리 실패',removeError);
+    throw err;
+  }
+}
+async function serverBuildRoom(room){
+  const {data:members,error:me}=await azitSupabase.from('room_members').select('user_id').eq('room_id',room.id);
+  if(me)throw me;
+  const ids=[...new Set((members||[]).map(x=>x.user_id))];
+  if(!ids.includes(currentUser.id))ids.push(currentUser.id);
+
+  const {data:profiles,error:pe}=await azitSupabase.from('profiles').select('id,nickname,avatar_url').in('id',ids);
+  if(pe)throw pe;
+  const byId=Object.fromEntries((profiles||[]).map(p=>[p.id,p]));
+  const emailById={};
+  ids.forEach(id=>emailById[id]=id===currentUser.id?currentUser.email:(byId[id]?.nickname||id));
+
+  const {data:channels,error:ce}=await azitSupabase.from('channels').select('id,name,type,created_by,created_at').eq('room_id',room.id).order('created_at',{ascending:true});
+  if(ce)throw ce;
+  const channelMap={},channelIds={},channelMembers={},channelMemberIds={},channelCreators={};
+  const channelIdList=(channels||[]).map(ch=>ch.id);
+  let membershipRows=[];
+  if(channelIdList.length){
+    const {data:cm,error:cme}=await azitSupabase.from('channel_members').select('channel_id,user_id').in('channel_id',channelIdList);
+    if(cme)throw cme;
+    membershipRows=cm||[];
+  }
+  for(const ch of (channels||[])){
+    channelIds[ch.name]=ch.id;
+    channelCreators[ch.name]=ch.created_by;
+    const {data:msgs,error:msgErr}=await azitSupabase.from('messages').select('id,sender_id,content,created_at').eq('channel_id',ch.id).order('created_at',{ascending:true});
+    if(msgErr)throw msgErr;
+    channelMap[ch.name]=await Promise.all((msgs||[]).map(async m=>{
+      let payload={text:m.content,media:null};
+      try{const parsed=JSON.parse(m.content);if(parsed&&typeof parsed==='object'&&('text' in parsed||'media' in parsed))payload=parsed}catch{}
+      const resolvedMedia=payload.media?.path?await azitResolveMedia(payload.media):payload.media||null;
+      return {id:m.id,sender:emailById[m.sender_id]||m.sender_id,senderId:m.sender_id,text:payload.text||'',media:resolvedMedia,createdAt:m.created_at,time:new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'})};
+    }));
+    const savedMemberIds=ch.name==='전체 채팅' ? ids : membershipRows.filter(x=>x.channel_id===ch.id).map(x=>x.user_id);
+    channelMemberIds[ch.name]=savedMemberIds;
+    channelMembers[ch.name]=savedMemberIds.map(id=>byId[id]?.nickname||(id===currentUser.id?currentUser.name:id));
+  }
+
+  if(!channelMap['전체 채팅'])channelMap['전체 채팅']=[];
+  if(!channelIds['전체 채팅']){
+    const {data:ch,error}=await azitSupabase.from('channels').insert({room_id:room.id,name:'전체 채팅',type:'group',created_by:currentUser.id}).select('id,name,created_by').single();
+    if(error)throw error;
+    channelIds[ch.name]=ch.id;
+    channelCreators[ch.name]=ch.created_by;
+    channelMemberIds[ch.name]=ids;
+    channelMembers[ch.name]=ids.map(id=>byId[id]?.nickname||(id===currentUser.id?currentUser.name:id));
+  }
+
+  const {data:soundRows,error:soundErr}=await azitSupabase.from('soundboard_sounds').select('id,name,storage_path,mime_type').eq('room_id',room.id).order('created_at',{ascending:true});
+  if(soundErr)throw soundErr;
+  const soundboard=await Promise.all((soundRows||[]).map(azitResolveSoundboardSound));
+
+  return {
+    id:room.id,name:room.name,code:room.code,owner:room.owner_id,
+    members:ids.map(id=>emailById[id]),memberIds:ids,profiles:byId,
+    channels:channelMap,channelMembers,channelMemberIds,channelIds,channelCreators,
+    soundboard
+  };
+}
+async function serverRenderMainRooms(){
+  const section=document.getElementById('existingRoomsSection'),list=document.getElementById('existingRoomsList');
+  try{
+    const rooms=await serverListRooms();
+    section.classList.toggle('hidden',!rooms.length);
+    document.getElementById('existingRoomCount').textContent=rooms.length?`${rooms.length}개`:'';
+    list.innerHTML=rooms.map(r=>`<button onclick="enterRoomByCode('${esc(r.code)}')" class="w-full text-left bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 rounded-xl p-3 flex items-center gap-3 hover:-translate-y-0.5 transition"><div class="w-9 h-9 rounded-xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center"><i class="fa-solid fa-comments"></i></div><div class="min-w-0"><div class="text-xs font-bold truncate">${esc(r.name)}</div><div class="text-[10px] text-slate-400 font-mono">${esc(r.code)}</div></div></button>`).join('');
+  }catch(e){console.error(e);section.classList.add('hidden');}
+}
+async function serverEnterRoomByCode(code){
+  try{
+    const room=await serverRoomByCode(code);
+    if(!room)return; // no local fallback: server is the only room source
+    await serverEnterRoom(room);
+  }catch(e){console.error(e);alert('방 정보를 불러오지 못했습니다: '+azitExplainError(e));}
+}
+async function serverEnterRoom(room){
+  try{
+    currentRoom=await serverBuildRoom(room);
+    activeChatChannel='전체 채팅';
+    soundboardSounds=currentRoom.soundboard||[];
+    pendingMedia=null;
+    document.getElementById('homeCurrentRoomCode').textContent=currentRoom.code;
+    renderParticipants();renderChatRoomList();showScreen('screenInRoom');switchTab('home');
+  }catch(e){console.error(e);currentRoom=null;alert('방 데이터를 불러오지 못했습니다: '+azitExplainError(e));}
+}
+async function serverCreateRoom(e){
+  e.preventDefault();
+  const name=document.getElementById('newRoomName').value.trim(),code=document.getElementById('newRoomCode').value.trim().toUpperCase();
+  if(!name)return;
+  try{
+    const dup=await serverRoomByCode(code);
+    if(dup){alert('이미 사용 중인 코드입니다. 다시 생성해주세요.');rerollCode();return;}
+    const {data:room,error:re}=await azitSupabase.from('rooms').insert({code,name,owner_id:currentUser.id}).select('*').single();
+    if(re)throw re;
+    const {error:me}=await azitSupabase.from('room_members').insert({room_id:room.id,user_id:currentUser.id});
+    if(me)throw me;
+    const {error:ce}=await azitSupabase.from('channels').insert({room_id:room.id,name:'전체 채팅',type:'group',created_by:currentUser.id});
+    if(ce)throw ce;
+    await serverEnterRoom(room);
+  }catch(e2){console.error(e2);alert('방을 만들지 못했습니다: '+azitExplainError(e2));}
+}
+async function serverJoinRoom(e){
+  e.preventDefault();
+  const code=document.getElementById('joinRoomCode').value.trim().toUpperCase();
+  try{
+    const room=await serverRoomByCode(code);
+    if(!room){alert('방을 찾을 수 없습니다. 방 코드가 맞는지 확인해주세요.');return;}
+    const {error}=await azitSupabase.from('room_members').upsert({room_id:room.id,user_id:currentUser.id},{onConflict:'room_id,user_id'});
+    if(error)throw error;
+    await serverEnterRoom(room);
+  }catch(e2){console.error(e2);alert('방에 참가하지 못했습니다: '+azitExplainError(e2));}
+}
+async function serverSendMessage(e){
+  e.preventDefault();
+  const input=document.getElementById('chatInput'),text=input.value.trim();
+  if(!text&&!pendingMedia)return;
+  const channelId=currentRoom?.channelIds?.[activeChatChannel];
+  if(!channelId){alert('채팅방 정보를 찾지 못했습니다.');return;}
+  let uploadedPath=null;
+  try{
+    const storedMedia= pendingMedia?.file ? await azitUploadChatMedia(pendingMedia,channelId) : (pendingMedia||null);
+    uploadedPath=storedMedia?.path||null;
+    const displayMedia=storedMedia?.path?await azitResolveMedia(storedMedia):storedMedia;
+    const payload={text:text||'',media:storedMedia};
+    const {data,error}=await azitSupabase.from('messages').insert({channel_id:channelId,sender_id:currentUser.id,content:JSON.stringify(payload)}).select('id,sender_id,content,created_at').single();
+    if(error)throw error;
+    const parsed=JSON.parse(data.content);
+    currentRoom.channels[activeChatChannel].push({id:data.id,sender:currentUser.email,senderId:currentUser.id,text:parsed.text||'',media:displayMedia||null,createdAt:data.created_at,time:new Date(data.created_at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'})});
+    input.value='';pendingMedia=null;document.getElementById('attachedMediaBar').classList.add('hidden');renderMessages();renderChatRoomList();
+  }catch(e2){
+    if(uploadedPath){try{await azitSupabase.storage.from('chat-media').remove([uploadedPath]);}catch(cleanupError){console.warn('첨부 파일 정리 실패',cleanupError);}}
+    console.error(e2);alert('메시지를 보내지 못했습니다: '+azitExplainError(e2));
+  }
+}
+async function serverLeaveRoom(){
+  if(!currentRoom||!currentUser)return;
+  try{
+    const roomId=currentRoom.id;
+
+    // 방장이 나가면 가입 시각이 가장 빠른 다음 멤버에게 방장 권한을 넘긴다.
+    // 마지막 멤버라면 방 자체를 삭제한다.
+    if(currentRoom.owner===currentUser.id){
+      const {data:nextMembers,error:memberErr}=await azitSupabase
+        .from('room_members')
+        .select('user_id,joined_at')
+        .eq('room_id',roomId)
+        .neq('user_id',currentUser.id)
+        .order('joined_at',{ascending:true})
+        .limit(1);
+      if(memberErr)throw memberErr;
+
+      const nextOwner=nextMembers?.[0]?.user_id||null;
+      if(nextOwner){
+        const {error:ownerErr}=await azitSupabase
+          .from('rooms')
+          .update({owner_id:nextOwner})
+          .eq('id',roomId)
+          .eq('owner_id',currentUser.id);
+        if(ownerErr)throw ownerErr;
+      }else{
+        const {error:deleteErr}=await azitSupabase
+          .from('rooms')
+          .delete()
+          .eq('id',roomId)
+          .eq('owner_id',currentUser.id);
+        if(deleteErr)throw deleteErr;
+        currentRoom=null;
+        await showMainMenu();
+        return;
+      }
+    }
+
+    const {error}=await azitSupabase
+      .from('room_members')
+      .delete()
+      .eq('room_id',roomId)
+      .eq('user_id',currentUser.id);
+    if(error)throw error;
+
+    currentRoom=null;
+    await showMainMenu();
+  }catch(e){
+    console.error(e);
+    alert('방에서 나가지 못했습니다: '+azitExplainError(e));
+  }
+}
+async function serverDeleteCurrentRoom(){
+  if(!currentRoom||!currentUser)return;
+  if(currentRoom.owner!==currentUser.id){alert('방을 처음 만든 사람만 방을 삭제할 수 있습니다.');return;}
+  const roomName=currentRoom.name||currentRoom.code;
+  if(!confirm(`'${roomName}' 방을 완전히 삭제하시겠습니까?\n\n방, 참여 정보, 채널, 메시지가 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`))return;
+  try{
+    const roomId=currentRoom.id;
+    const {data:check,error:checkErr}=await azitSupabase.from('rooms').select('id,owner_id').eq('id',roomId).eq('owner_id',currentUser.id).maybeSingle();
+    if(checkErr)throw checkErr;
+    if(!check){throw new Error('현재 계정이 이 방의 방장으로 확인되지 않습니다. 방 목록을 새로고침한 뒤 다시 시도해주세요.');}
+
+    const {error}=await azitSupabase.from('rooms').delete().eq('id',roomId).eq('owner_id',currentUser.id);
+    if(error)throw error;
+
+    const {data:stillThere,error:verifyErr}=await azitSupabase.from('rooms').select('id').eq('id',roomId).maybeSingle();
+    if(verifyErr)throw verifyErr;
+    if(stillThere)throw new Error('방 삭제 권한(RLS)이 적용되지 않았습니다. 아래 SQL을 Supabase SQL Editor에서 실행해야 합니다.');
+
+    currentRoom=null;
+    await showMainMenu();
+  }catch(e){
+    console.error(e);
+    alert('방을 삭제하지 못했습니다.\n\n'+azitExplainError(e));
+  }
+}
+
+/* Kill the old room cache once. From this point rooms/messages are server-only. */
+function clearLegacyRoomCache(){
+  try{
+    state=state||{};
+    state.rooms={};
+    saveState();
+  }catch(e){console.warn('legacy room cache cleanup failed',e);}
+}
+const _stableShowMainMenu=showMainMenu;
+showMainMenu=async function(){
+  clearLegacyRoomCache();
+  document.getElementById('welcomeText').textContent=`${currentUser.name}님, 다시 오셨네요.`;
+  updateProfile();
+  await serverRenderMainRooms();
+  showScreen('screenMainMenu');
+};
+enterRoomByCode=serverEnterRoomByCode;
+enterRoom=serverEnterRoom;
+handleCreateRoom=serverCreateRoom;
+handleJoinRoom=serverJoinRoom;
+sendChatMessage=serverSendMessage;
+leaveRoom=serverLeaveRoom;
+
+</script>
+
+
+
+
+<script>
+/* ===== AZIT 1.0.6 — clean server settings ===== */
+async function azitRenderSettingsJoinedRooms(){
+  const box=document.getElementById('settingsJoinedRooms');
+  const count=document.getElementById('settingsRoomCount');
+  if(!box)return;
+  const deleteBtn=document.getElementById('deleteCurrentRoomBtn');
+  if(deleteBtn)deleteBtn.classList.toggle('hidden',!(currentRoom&&currentUser?.id&&currentRoom.owner===currentUser.id));
+  if(!currentUser?.id){
+    if(count)count.textContent='';
+    if(deleteBtn)deleteBtn.classList.add('hidden');
+    box.innerHTML='<div class="text-[11px] text-slate-400 text-center py-4">로그인 후 참여 중인 방을 확인할 수 있습니다.</div>';
+    return;
+  }
+  box.innerHTML='<div class="text-[11px] text-slate-400 text-center py-4">불러오는 중...</div>';
+  try{
+    const rooms=await serverListRooms();
+    if(count)count.textContent=`${rooms.length}개`;
+    if(deleteBtn)deleteBtn.classList.toggle('hidden',!(currentRoom&&currentUser?.id&&currentRoom.owner===currentUser.id));
+    if(!rooms.length){
+      box.innerHTML='<div class="text-[11px] text-slate-400 text-center py-4">참여 중인 방이 없습니다.</div>';
+      return;
+    }
+    box.innerHTML=rooms.map(r=>`<button type="button" onclick="enterRoomByCode('${esc(r.code)}')" class="w-full text-left p-3 rounded-xl border ${currentRoom&&currentRoom.code===r.code?'border-navy-800/30 dark:border-brown-500/40 bg-navy-800/5 dark:bg-brown-500/10':'border-ivory-300 dark:border-neutral-800 bg-ivory-50 dark:bg-darkbg-950'} hover:-translate-y-0.5 transition flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center shrink-0"><i class="fa-solid fa-comments"></i></div>
+      <div class="min-w-0 flex-1"><div class="text-xs font-bold truncate">${esc(r.name)}</div><div class="text-[10px] text-slate-400 font-mono">${esc(r.code)}</div></div>
+      ${currentRoom&&currentRoom.code===r.code?'<span class="text-[9px] text-emerald-600">현재 방</span>':'<i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>'}
+    </button>`).join('');
+  }catch(err){
+    console.error('settings room list:',err);
+    if(count)count.textContent='';
+    box.innerHTML='<div class="text-[11px] text-rose-500 text-center py-4">참여 중인 방 목록을 불러오지 못했습니다.</div>';
+  }
+}
+const azitSwitchTabFinal=switchTab;
+switchTab=function(t){
+  azitSwitchTabFinal(t);
+  if(t==='settings')azitRenderSettingsJoinedRooms();
+};
+
+/* ===== AZIT 1.0.10 — Supabase Realtime chat ===== */
+let azitRealtimeChannel=null;
+let azitRealtimeRefreshTimer=null;
+let azitRealtimeRefreshBusy=false;
+let azitRealtimeRefreshQueued=false;
+let azitRealtimeRetryTimer=null;
+let azitRealtimeRetryCount=0;
+let azitRealtimeGeneration=0;
+let azitRealtimeStatusTimer=null;
+
+function azitRealtimeStatus(message,kind='info',autoHide=false){
+  let el=document.getElementById('azitRealtimeStatus');
+  if(!el){
+    el=document.createElement('div');
+    el.id='azitRealtimeStatus';
+    el.setAttribute('role','status');
+    el.setAttribute('aria-live','polite');
+    el.style.cssText='position:fixed;right:14px;bottom:14px;z-index:99999;max-width:min(360px,calc(100vw - 28px));padding:10px 13px;border-radius:12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.16);display:none;';
+    document.body.appendChild(el);
+  }
+  clearTimeout(azitRealtimeStatusTimer);
+  el.textContent=message;
+  el.style.display='block';
+  el.style.background=kind==='error'?'#fee2e2':kind==='warn'?'#fef3c7':'#e0f2fe';
+  el.style.color=kind==='error'?'#991b1b':kind==='warn'?'#92400e':'#075985';
+  if(autoHide)azitRealtimeStatusTimer=setTimeout(()=>{if(el)el.style.display='none';},3500);
+}
+
+async function azitRefreshRoomFromServer(){
+  if(!currentUser?.id||!currentRoom?.id)return;
+  if(azitRealtimeRefreshBusy){azitRealtimeRefreshQueued=true;return;}
+  azitRealtimeRefreshBusy=true;
+  try{
+    const roomSnapshot={id:currentRoom.id,name:currentRoom.name,code:currentRoom.code,owner:currentRoom.owner};
+    const activeName=activeChatChannel;
+    const rebuilt=await serverBuildRoom(roomSnapshot);
+    if(!currentRoom||currentRoom.id!==roomSnapshot.id)return;
+    currentRoom=rebuilt;
+    soundboardSounds=currentRoom.soundboard||[];
+    if(!currentRoom.channels?.[activeName]||!azitIsActiveChannelMember(activeName)){
+      activeChatChannel=Object.keys(currentRoom.channels||{}).find(azitIsActiveChannelMember)||'전체 채팅';
+    }
+    renderChatRoomList();
+    if(document.getElementById('chatDetailView')&&!document.getElementById('chatDetailView').classList.contains('hidden')){
+      document.getElementById('activeChatTitle').textContent=activeChatChannel||'전체 채팅';
+      document.getElementById('activeChatSub').textContent=`${(currentRoom.channelMemberIds?.[activeChatChannel]||currentRoom.memberIds||[]).length}명 참여`;
+      renderMessages();
+    }
+    if(document.getElementById('modalSoundboard')&&!document.getElementById('modalSoundboard').classList.contains('hidden'))renderSoundboard();
+  }catch(e){console.warn('[Azit Realtime] room refresh failed:',e);azitRealtimeStatus('채팅 데이터 새로고침에 실패했습니다. 연결 상태를 확인하고 다시 시도해주세요.','warn');}
+  finally{
+    azitRealtimeRefreshBusy=false;
+    if(azitRealtimeRefreshQueued){
+      azitRealtimeRefreshQueued=false;
+      setTimeout(azitRefreshRoomFromServer,150);
+    }
+  }
+}
+function queueAzitRoomRefresh(){
+  clearTimeout(azitRealtimeRefreshTimer);
+  azitRealtimeRefreshTimer=setTimeout(azitRefreshRoomFromServer,250);
+}
+
+function stopAzitRealtime(){
+  azitRealtimeGeneration++;
+  clearTimeout(azitRealtimeRetryTimer);
+  azitRealtimeRetryTimer=null;
+  try{
+    if(azitRealtimeChannel){
+      const oldChannel=azitRealtimeChannel;
+      azitRealtimeChannel=null;
+      azitSupabase.removeChannel(oldChannel).catch(e=>console.warn('Realtime cleanup failed',e));
+    }
+  }catch(e){console.warn('Realtime cleanup failed',e);}
+}
+
+function scheduleAzitRealtimeRetry(generation){
+  if(generation!==azitRealtimeGeneration||!currentUser?.id||!currentRoom?.id||!navigator.onLine)return;
+  clearTimeout(azitRealtimeRetryTimer);
+  azitRealtimeRetryCount=Math.min(azitRealtimeRetryCount+1,6);
+  const delay=Math.min(30000,1000*Math.pow(2,azitRealtimeRetryCount-1));
+  azitRealtimeStatus(`실시간 연결이 끊겼어요. ${Math.ceil(delay/1000)}초 후 다시 연결합니다.`, 'warn');
+  azitRealtimeRetryTimer=setTimeout(()=>{
+    if(generation===azitRealtimeGeneration&&currentUser?.id&&currentRoom?.id)startAzitRealtime(true);
+  },delay);
+}
+
+function startAzitRealtime(isRetry=false){
+  stopAzitRealtime();
+  if(!currentUser?.id || !currentRoom?.id)return;
+  if(!navigator.onLine){azitRealtimeStatus('인터넷 연결이 끊겼습니다. 연결이 복구되면 다시 시도합니다.','warn');return;}
+  if(!isRetry)azitRealtimeRetryCount=0;
+  const generation=azitRealtimeGeneration;
+  const roomId=currentRoom.id;
+
+  azitRealtimeChannel=azitSupabase
+    .channel(`azit-messages-${currentRoom.id}-${Date.now()}`)
+    .on('postgres_changes',{
+      event:'INSERT',
+      schema:'public',
+      table:'messages'
+    },async payload=>{
+      const m=payload?.new;
+      if(!m||!currentRoom)return;
+      const channelName=Object.keys(currentRoom.channelIds||{}).find(k=>currentRoom.channelIds[k]===m.channel_id);
+      if(!channelName)return;
+
+      let parsed={text:m.content,media:null};
+      try{
+        const x=JSON.parse(m.content);
+        if(x&&typeof x==='object'&&('text' in x||'media' in x))parsed=x;
+      }catch{}
+
+      currentRoom.channels[channelName]=currentRoom.channels[channelName]||[];
+      if(currentRoom.channels[channelName].some(x=>x.id===m.id))return;
+
+      const senderProfile=currentRoom.profiles?.[m.sender_id];
+      const sender=m.sender_id===currentUser.id
+        ? currentUser.email
+        : (senderProfile?.nickname||m.sender_id);
+
+      let resolvedMedia=parsed.media||null;
+      try{if(resolvedMedia?.path)resolvedMedia=await azitResolveMedia(resolvedMedia);}catch(mediaError){console.warn('첨부 파일 URL을 불러오지 못했습니다.',mediaError);}
+      currentRoom.channels[channelName].push({
+        id:m.id,
+        sender,
+        senderId:m.sender_id,
+        text:parsed.text||'',
+        media:resolvedMedia,
+        createdAt:m.created_at,
+        time:new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'numeric',minute:'2-digit'})
+      });
+
+      renderChatRoomList();
+      if(activeChatChannel===channelName)renderMessages();
+    })
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'channels',filter:`room_id=eq.${currentRoom.id}`
+    },()=>queueAzitRoomRefresh())
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'channel_members'
+    },()=>queueAzitRoomRefresh())
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'soundboard_sounds',filter:`room_id=eq.${currentRoom.id}`
+    },()=>queueAzitRoomRefresh())
+    .subscribe(status=>{
+      console.log('[Azit Realtime]',status);
+      if(generation!==azitRealtimeGeneration||currentRoom?.id!==roomId)return;
+      if(status==='SUBSCRIBED'){
+        azitRealtimeRetryCount=0;
+        clearTimeout(azitRealtimeRetryTimer);
+        azitRealtimeRetryTimer=null;
+        azitRealtimeStatus('실시간 동기화 연결됨','info',true);
+        if(isRetry)queueAzitRoomRefresh();
+      }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+        scheduleAzitRealtimeRetry(generation);
+      }
+    });
+}
+
+window.addEventListener('online',()=>{
+  if(currentUser?.id&&currentRoom?.id){azitRealtimeStatus('인터넷 연결이 복구됐습니다. 실시간 연결을 다시 시도합니다.','info',true);startAzitRealtime(true);}
+});
+window.addEventListener('offline',()=>{
+  clearTimeout(azitRealtimeRetryTimer);
+  azitRealtimeRetryTimer=null;
+  azitRealtimeStatus('인터넷 연결이 끊겼습니다. 연결이 복구되면 자동으로 재시도합니다.','warn');
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&navigator.onLine&&currentUser?.id&&currentRoom?.id){
+    queueAzitRoomRefresh();
+  }
+});
+
+const _serverEnterRoomRealtime=serverEnterRoom;
+serverEnterRoom=async function(room){
+  stopAzitRealtime();
+  await _serverEnterRoomRealtime(room);
+  if(currentRoom)startAzitRealtime();
+};
+
+const _serverLeaveRoomRealtime=serverLeaveRoom;
+serverLeaveRoom=async function(){
+  stopAzitRealtime();
+  await _serverLeaveRoomRealtime();
+};
+
+const _serverDeleteCurrentRoomRealtime=serverDeleteCurrentRoom;
+serverDeleteCurrentRoom=async function(){
+  stopAzitRealtime();
+  await _serverDeleteCurrentRoomRealtime();
+};
+
+</script>
+
+<script>
+(function(){
+  const _origEnsureProfile = window.ensureProfile;
+  async function syncAzitProfile(){
+    if(!window.azitSupabase || !window.currentUser) return;
+    const uid=window.currentUser.id;
+    const nickname=(window.currentUser.name||window.currentUser.nickname||window.currentUser.email?.split('@')[0]||'사용자').trim();
+    const avatar=window.currentUser.avatar||window.currentUser.avatar_url||null;
+    const {data,error}=await azitSupabase.from('profiles')
+      .upsert({id:uid,nickname:nickname,avatar_url:avatar},{onConflict:'id'})
+      .select('id,nickname,avatar_url').single();
+    if(error){ console.warn('프로필 서버 저장 실패',error); return; }
+    window.currentUser.name=data.nickname||nickname;
+    window.currentUser.nickname=data.nickname||nickname;
+    window.currentUser.avatar=data.avatar_url||null;
+    try{ localStorage.setItem('azit_profile_server_v1',JSON.stringify({id:uid,nickname:window.currentUser.name,avatar_url:window.currentUser.avatar})); }catch(e){}
+    return data;
+  }
+  window.syncAzitProfile=syncAzitProfile;
+
+  const _oldShow=window.showScreen;
+  window.showScreen=function(id){
+    const r=_oldShow.apply(this,arguments);
+    if(id==='screenSettings') setTimeout(()=>syncAzitProfile(),0);
+    return r;
+  };
+
+  // Expose a small server-backed profile save hook for the existing settings UI.
+  window.saveAzitProfile=async function(nickname,avatarUrl){
+    if(!window.azitSupabase||!window.currentUser) throw new Error('로그인이 필요합니다.');
+    nickname=(nickname||'').trim();
+    if(!nickname) throw new Error('닉네임을 입력해주세요.');
+    const {data,error}=await azitSupabase.from('profiles')
+      .upsert({id:currentUser.id,nickname,avatar_url:avatarUrl||null},{onConflict:'id'})
+      .select('id,nickname,avatar_url').single();
+    if(error) throw error;
+    currentUser.name=data.nickname;
+    currentUser.nickname=data.nickname;
+    currentUser.avatar=data.avatar_url||null;
+    try{ localStorage.setItem('azit_profile_server_v1',JSON.stringify(data)); }catch(e){}
+    return data;
+  };
+
+  // Sync once after auth/session initialization.
+  setTimeout(()=>syncAzitProfile(),1200);
+})();
+</script>
+
+<script>
+/* AZIT 1.0.13 — Supabase Storage-backed chat media */
+/* AZIT 1.0.12 — persistent sub-chat membership */
+function azitIsActiveChannelMember(name){
+  if(!currentRoom||!currentUser)return false;
+  if(name==='전체 채팅')return (currentRoom.memberIds||[]).includes(currentUser.id);
+  if(currentRoom.channelMemberIds)return (currentRoom.channelMemberIds[name]||[]).includes(currentUser.id);
+  return (currentRoom.channelMembers?.[name]||[]).includes(currentUser.email);
+}
+function renderChatRoomList(){
+  const box=document.getElementById('chatRoomsList'); if(!box||!currentRoom)return;
+  box.innerHTML='';
+  Object.keys(currentRoom.channels||{}).forEach(name=>{
+    if(!azitIsActiveChannelMember(name))return;
+    const msgs=currentRoom.channels[name]||[],last=msgs[msgs.length-1];
+    const memberCount=(currentRoom.channelMemberIds?.[name]||currentRoom.channelMembers?.[name]||currentRoom.members||[]).length;
+    const item=document.createElement('div');
+    item.className='bg-white dark:bg-darkbg-900 border border-ivory-300 dark:border-neutral-800 p-3.5 rounded-2xl cursor-pointer';
+    item.addEventListener('click',()=>openChatDetail(name));
+    item.innerHTML=`<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-2xl bg-navy-800/10 dark:bg-brown-500/20 flex items-center justify-center"><i class="fa-solid ${name==='전체 채팅'?'fa-comments':'fa-hashtag'}"></i></div><div class="overflow-hidden"><h4 class="font-bold text-xs truncate">${esc(name)}</h4><p class="text-[11px] text-slate-500 truncate">${name==='전체 채팅'?'전체 채팅 · '+memberCount+'명':memberCount+'명 · '+esc(last?.text||'새 대화를 시작해보세요.')}</p></div></div>`;
+    box.appendChild(item);
+  });
+}
+function openCreateSubChatModal(){
+  const list=document.getElementById('memberSelectList'); list.innerHTML='';
+  (currentRoom.memberIds||[]).forEach(uid=>{
+    if(uid===currentUser.id)return;
+    const profile=currentRoom.profiles?.[uid]||{}; const label=profile.nickname||uid;
+    const row=document.createElement('label'); row.className='flex items-center gap-2 p-2 rounded-xl hover:bg-ivory-100 dark:hover:bg-darkbg-950 cursor-pointer';
+    row.innerHTML=`<input type="checkbox" value="${esc(uid)}" class="subchat-member-checkbox"><span>${esc(label)}</span>`; list.appendChild(row);
+  });
+  document.getElementById('subChatNameInput').value='';
+  document.getElementById('subChatStepMembers').classList.remove('hidden');
+  document.getElementById('subChatStepName').classList.add('hidden');
+  const modal=document.getElementById('modalCreateSubChat');modal.classList.remove('hidden');
+  const card=modal.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter');
+}
+async function submitCreateSubChat(){
+  const name=document.getElementById('subChatNameInput').value.trim();
+  if(!name){alert('채팅방 이름을 입력해주세요.');return;}
+  if(name==='전체 채팅'||currentRoom.channels[name]){alert('이미 존재하는 채팅방입니다.');return;}
+  const selected=[...document.querySelectorAll('.subchat-member-checkbox:checked')].map(x=>x.value);
+  if(!selected.length){alert('초대할 친구를 한 명 이상 선택해주세요.');return;}
+  const memberIds=[...new Set([currentUser.id,...selected])];
+  try{
+    const {data:channel,error}=await azitSupabase.from('channels').insert({room_id:currentRoom.id,name,type:'group',created_by:currentUser.id}).select('id,name').single();
+    if(error)throw error;
+    const {error:memberError}=await azitSupabase.from('channel_members').insert(memberIds.map(user_id=>({channel_id:channel.id,user_id})));
+    if(memberError){
+      await azitSupabase.from('channels').delete().eq('id',channel.id);
+      throw memberError;
+    }
+    currentRoom.channels[name]=[];currentRoom.channelIds[name]=channel.id;currentRoom.channelCreators=currentRoom.channelCreators||{};currentRoom.channelCreators[name]=currentUser.id;
+    currentRoom.channelMemberIds[name]=memberIds;
+    currentRoom.channelMembers[name]=memberIds.map(uid=>currentRoom.profiles?.[uid]?.nickname||(uid===currentUser.id?currentUser.name:uid));
+    closeSubChatModal();renderChatRoomList();
+  }catch(err){console.error(err);alert('소그룹을 만들지 못했습니다: '+azitExplainError(err));}
+}
+function openManageSubChatModal(){
+  if(activeChatChannel==='전체 채팅')return;
+  if(currentRoom?.channelCreators?.[activeChatChannel]!==currentUser?.id){alert('소그룹 생성자만 참여자를 관리할 수 있습니다.');return;}
+  const list=document.getElementById('manageMemberList');list.innerHTML='';
+  const members=currentRoom.channelMemberIds?.[activeChatChannel]||[];
+  (currentRoom.memberIds||[]).forEach(uid=>{
+    const label=currentRoom.profiles?.[uid]?.nickname||(uid===currentUser.id?currentUser.name:uid);
+    const checked=members.includes(uid)?'checked':'';const disabled=uid===currentUser.id?'disabled':'';
+    list.innerHTML+=`<label class="flex items-center gap-2 p-1.5"><input type="checkbox" value="${esc(uid)}" class="manage-subchat-member-checkbox" ${checked} ${disabled}><span>${esc(label)}${uid===currentUser.id?' (나)':''}</span></label>`;
+  });
+  const modal=document.getElementById('modalManageSubChat');modal.classList.remove('hidden');const card=modal.querySelector('.modal-card');card.classList.remove('modal-enter');void card.offsetWidth;card.classList.add('modal-enter');
+}
+async function saveManageSubChat(){
+  if(currentRoom?.channelCreators?.[activeChatChannel]!==currentUser?.id){alert('소그룹 생성자만 참여자를 관리할 수 있습니다.');return;}
+  const selected=[...document.querySelectorAll('.manage-subchat-member-checkbox:checked')].map(x=>x.value);
+  if(!selected.includes(currentUser.id))selected.push(currentUser.id);
+  if(selected.length<2){alert('소그룹에는 나를 포함해 한 명 이상의 친구가 필요합니다.');return;}
+  try{
+    const channelId=currentRoom.channelIds?.[activeChatChannel];if(!channelId)throw new Error('채널 정보를 찾지 못했습니다.');
+    const {error:delError}=await azitSupabase.from('channel_members').delete().eq('channel_id',channelId);
+    if(delError)throw delError;
+    const {error:insError}=await azitSupabase.from('channel_members').insert([...new Set(selected)].map(user_id=>({channel_id:channelId,user_id})));
+    if(insError)throw insError;
+    currentRoom.channelMemberIds[activeChatChannel]=[...new Set(selected)];
+    currentRoom.channelMembers[activeChatChannel]=currentRoom.channelMemberIds[activeChatChannel].map(uid=>currentRoom.profiles?.[uid]?.nickname||(uid===currentUser.id?currentUser.name:uid));
+    closeManageSubChatModal();
+    if(!azitIsActiveChannelMember(activeChatChannel)){closeChatDetail();return;}
+    document.getElementById('activeChatSub').textContent=`${selected.length}명 참여`;renderChatRoomList();
+  }catch(err){console.error(err);alert('멤버 정보를 저장하지 못했습니다: '+azitExplainError(err));}
+}
+</script>
+
+</body>
+</html>
