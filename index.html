@@ -218,6 +218,11 @@ window.onload=async()=>{
   rerollCode();
   toggleDarkMode(localStorage.getItem(KEY_THEME)==='dark');
   const {data:{session}}=await azitSupabase.auth.getSession();
+  console.log('=== AZIT AUTH DEBUG ===');
+console.log('Auth User ID:', authData.user?.id);
+console.log('Current User ID:', currentUser?.id);
+console.log('Access Token:', (await azitSupabase.auth.getSession()).data.session?.access_token ? '존재함' : '없음');
+console.log('=======================');
   if(session?.user){
     const profile=await ensureProfile(session.user);
     if(profile){
