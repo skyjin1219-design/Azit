@@ -811,15 +811,16 @@ async function serverJoinRoom(e){
 
     // 인증에서 확인한 실제 ID로 참여 처리
     const { data, error } = await azitSupabase
-      .from('room_members')
-      .upsert({
-        room_id: room.id,
-        user_id: authUser.id
-      }, {
-        onConflict: 'room_id,user_id'
-      })
-      .select();
+  .from('room_members')
+  .insert({
+    room_id: room.id,
+    user_id: authUser.id
+  })
+  .select();
 
+if (error) throw error;
+
+console.log('[AZIT INSERT 성공]', data);
     if (error) throw error;
 
     await serverEnterRoom(room);
