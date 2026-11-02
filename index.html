@@ -801,7 +801,10 @@ async function serverJoinRoom(e){
         ' / 인증=' + authUser.id
       );
     }
+const { data: authDebug, error: debugError } =
+  await azitSupabase.rpc('azit_debug_auth');
 
+console.log('[AZIT JWT 확인]', authDebug, debugError);
     const room = await serverRoomByCode(code);
 
     if (!room) {
